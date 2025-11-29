@@ -45,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
+            // Use monospace font to prevent width changes
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
             button.title = timerManager.formattedTime
             button.action = #selector(togglePopover)
             button.target = self
