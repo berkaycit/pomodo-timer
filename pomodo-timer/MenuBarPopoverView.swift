@@ -16,7 +16,7 @@ struct MenuBarPopoverView: View {
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Constants.UI.standardSpacing) {
             // Timer Display
             TimerDisplaySection()
 
@@ -35,8 +35,8 @@ struct MenuBarPopoverView: View {
             // Quit Button
             QuitButton()
         }
-        .padding(16)
-        .frame(width: 280)
+        .padding(Constants.UI.standardPadding)
+        .frame(width: Constants.UI.popoverWidth)
     }
 }
 

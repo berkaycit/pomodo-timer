@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import OSLog
 
 // MARK: - Timer State
 
@@ -20,6 +21,7 @@ enum TimerState {
 // MARK: - Timer Preset
 
 enum TimerPreset: Int, CaseIterable, Hashable {
+    case one = 1
     case twentyFive = 25
     case fortyFive = 45
 
@@ -40,27 +42,31 @@ enum TimerPreset: Int, CaseIterable, Hashable {
 
 /// Manages the Pomodoro timer state, countdown logic, and preset selection.
 /// Uses Combine publishers to notify observers of state changes.
-class TimerManager: ObservableObject {
+/// All state updates are performed on the main thread for thread safety.
+final class TimerManager: ObservableObject {
     // MARK: Published Properties
 
     /// Current state of the timer (idle, running, paused, finished)
-    @Published var state: TimerState = .idle
+    @Published private(set) var state: TimerState = .idle
 
     /// Remaining time in seconds
-    @Published var remainingTime: TimeInterval = TimerPreset.twentyFive.seconds
+    @Published private(set) var remainingTime: TimeInterval = TimerPreset.twentyFive.seconds
 
     /// Currently selected preset duration
-    @Published var selectedPreset: TimerPreset = .twentyFive
+    @Published private(set) var selectedPreset: TimerPreset = .twentyFive
 
     // MARK: Private Properties
 
     private var timer: Timer?
     private var endTime: Date?
-    private let userDefaultsKey = "selectedPreset"
+    private let notificationService: NotificationServiceProtocol
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "pomodo-timer",
+                               category: "TimerManager")
 
     // MARK: - Initialization
 
-    init() {
+    init(notificationService: NotificationServiceProtocol = NotificationService()) {
+        self.notificationService = notificationService
         loadPreset()
         remainingTime = selectedPreset.seconds
     }
@@ -73,58 +79,82 @@ class TimerManager: ObservableObject {
 
     /// Starts the timer from idle or finished state
     func start() {
-        guard state == .idle || state == .finished else { return }
+        ensureMainThread {
+            guard self.state == .idle || self.state == .finished else {
+                self.logger.warning("Attempted to start timer in invalid state: \(String(describing: self.state))")
+                return
+            }
 
-        state = .running
-        endTime = Date().addingTimeInterval(remainingTime)
-        startTimer()
+            self.state = .running
+            self.endTime = Date().addingTimeInterval(self.remainingTime)
+            self.startTimer()
+        }
     }
 
     /// Pauses the running timer
     func pause() {
-        guard state == .running else { return }
+        ensureMainThread {
+            guard self.state == .running else {
+                self.logger.warning("Attempted to pause timer in invalid state: \(String(describing: self.state))")
+                return
+            }
 
-        state = .paused
-        stopTimer()
+            self.state = .paused
+            self.stopTimer()
+        }
     }
 
     /// Resumes the paused timer from where it left off
     func resume() {
-        guard state == .paused else { return }
+        ensureMainThread {
+            guard self.state == .paused else {
+                self.logger.warning("Attempted to resume timer in invalid state: \(String(describing: self.state))")
+                return
+            }
 
-        state = .running
-        endTime = Date().addingTimeInterval(remainingTime)
-        startTimer()
+            self.state = .running
+            self.endTime = Date().addingTimeInterval(self.remainingTime)
+            self.startTimer()
+        }
     }
 
     /// Resets the timer to the selected preset duration
     func reset() {
-        stopTimer()
-        state = .idle
-        remainingTime = selectedPreset.seconds
+        ensureMainThread {
+            self.stopTimer()
+            self.state = .idle
+            self.remainingTime = self.selectedPreset.seconds
+        }
     }
 
     /// Changes the selected preset and updates remaining time
     /// - Parameter preset: The new preset duration to use
     /// - Note: Cannot change preset while timer is running
     func selectPreset(_ preset: TimerPreset) {
-        guard state != .running else { return }
+        ensureMainThread {
+            guard self.state != .running else {
+                self.logger.warning("Cannot change preset while timer is running")
+                return
+            }
 
-        // Update remainingTime FIRST, then selectedPreset
-        // This ensures CombineLatest fires with correct values
-        remainingTime = preset.seconds
-        selectedPreset = preset
-        savePreset()
+            // Update remainingTime FIRST, then selectedPreset
+            // This ensures CombineLatest fires with correct values
+            self.remainingTime = preset.seconds
+            self.selectedPreset = preset
+            self.savePreset()
+        }
     }
 
     // MARK: - Private Methods
 
     private func startTimer() {
-        // Use Timer with tolerance for better performance
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(
+            withTimeInterval: Constants.Timer.tickInterval,
+            repeats: true
+        ) { [weak self] _ in
             self?.tick()
         }
-        timer?.tolerance = 0.1 // 100ms tolerance for power efficiency
+        timer?.tolerance = Constants.Timer.tolerance
     }
 
     private func stopTimer() {
@@ -141,27 +171,45 @@ class TimerManager: ObservableObject {
 
         let remaining = endTime.timeIntervalSinceNow
 
-        if remaining <= 0 {
-            remainingTime = 0
-            state = .finished
-            stopTimer()
+        ensureMainThread {
+            if remaining <= 0 {
+                self.remainingTime = 0
+                self.state = .finished
+                self.stopTimer()
+                self.handleTimerCompletion()
+            } else {
+                self.remainingTime = remaining
+            }
+        }
+    }
+
+    private func handleTimerCompletion() {
+        notificationService.sendTimerCompletedNotification()
+    }
+
+    /// Ensures the closure is executed on the main thread
+    /// - Parameter work: The closure to execute
+    private func ensureMainThread(_ work: @escaping () -> Void) {
+        if Thread.isMainThread {
+            work()
         } else {
-            remainingTime = remaining
+            DispatchQueue.main.async {
+                work()
+            }
         }
     }
 
     // MARK: - UserDefaults Persistence
 
     private func savePreset() {
-        UserDefaults.standard.set(selectedPreset.rawValue, forKey: userDefaultsKey)
+        UserDefaults.standard.set(selectedPreset.rawValue, forKey: Constants.UserDefaultsKeys.selectedPreset)
     }
 
     private func loadPreset() {
-        let savedValue = UserDefaults.standard.integer(forKey: userDefaultsKey)
+        let savedValue = UserDefaults.standard.integer(forKey: Constants.UserDefaultsKeys.selectedPreset)
         if let preset = TimerPreset(rawValue: savedValue) {
             selectedPreset = preset
         } else {
-            // Default to 25 minutes if no valid preset found
             selectedPreset = .twentyFive
         }
     }

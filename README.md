@@ -8,6 +8,7 @@ Ultra-lightweight, menu bar Pomodoro timer for macOS.
 - **Ultra Lightweight:** CPU usage <0.5%, minimal RAM footprint (~30-40 MB)
 - **Simple & Focused:** No distractions, just a timer
 - **Quick Presets:** 25 and 45 minute duration options
+- **Native Notifications:** macOS notification with sound when timer completes
 - **Auto Theme:** Automatically adapts to macOS Dark/Light mode
 - **Performance Optimized:** Runs efficiently for hours without impacting system resources
 
@@ -56,6 +57,7 @@ Click the menu bar item to access:
 - **UI Framework:** SwiftUI
 - **Timer Mechanism:** `Timer` with tolerance for power efficiency
 - **State Management:** Combine ObservableObject pattern
+- **Notifications:** UserNotifications framework (native macOS notifications)
 - **Data Persistence:** UserDefaults (preset preference only)
 - **Menu Bar:** NSStatusBar with NSPopover
 
@@ -76,12 +78,14 @@ open /path/to/pomodo-timer.app
 
 ```
 pomodo-timer/
-├── pomodo_timerApp.swift       (19 lines)  - App entry point
-├── AppDelegate.swift            (89 lines)  - Menu bar management
-├── TimerManager.swift           (175 lines) - Timer logic & state
-└── MenuBarPopoverView.swift     (265 lines) - UI components
+├── pomodo_timerApp.swift        (19 lines)  - App entry point
+├── AppDelegate.swift            (116 lines) - Menu bar management
+├── TimerManager.swift           (224 lines) - Timer logic & state
+├── MenuBarPopoverView.swift     (265 lines) - UI components
+├── NotificationService.swift    (70 lines)  - Notification handling
+└── Constants.swift              (47 lines)  - App constants
 ────────────────────────────────────────────
-Total: ~550 lines (clean, documented, efficient)
+Total: ~740 lines (clean, documented, efficient)
 ```
 
 ## Code Quality
@@ -104,15 +108,6 @@ Total: ~550 lines (clean, documented, efficient)
 - Minimal UI redraws
 - Debounced publisher updates (10ms)
 
-## Future Enhancements (v1.1+)
-
-Potential improvements:
-- [ ] Keyboard shortcuts (Space: Play/Pause, R: Reset)
-- [ ] Custom duration input
-- [ ] Optional sound notification
-- [ ] Pomodoro session counter
-- [ ] Long/short break system
-
 ## Performance Tests
 
 ### CPU Test
@@ -128,14 +123,6 @@ Instruments profiling for 8+ hours:
 ### Timer Accuracy Test
 1 hour runtime compared to system clock:
 - Drift: ±1 second (acceptable)
-
-## License
-
-[License information to be added]
-
-## Contact
-
-[Contact information to be added]
 
 ---
 
