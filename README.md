@@ -2,6 +2,10 @@
 
 Ultra-lightweight, menu bar Pomodoro timer for macOS.
 
+<p align="center">
+  <img src="pomodo-timer.png" alt="Pomodo Timer Screenshot" width="300">
+</p>
+
 ## Features
 
 - **Menu Bar Integration:** Lives in your menu bar, always visible next to the clock
