@@ -85,6 +85,11 @@ final class TimerManager: ObservableObject {
                 return
             }
 
+            // If timer is finished, reset remainingTime to selected preset
+            if self.state == .finished {
+                self.remainingTime = self.selectedPreset.seconds
+            }
+
             self.state = .running
             self.endTime = Date().addingTimeInterval(self.remainingTime)
             self.startTimer()
@@ -137,6 +142,12 @@ final class TimerManager: ObservableObject {
                 return
             }
 
+            // If changing preset while paused, reset to idle state
+            if self.state == .paused {
+                self.stopTimer()
+                self.state = .idle
+            }
+
             // Update remainingTime FIRST, then selectedPreset
             // This ensures CombineLatest fires with correct values
             self.remainingTime = preset.seconds
@@ -178,7 +189,8 @@ final class TimerManager: ObservableObject {
                 self.stopTimer()
                 self.handleTimerCompletion()
             } else {
-                self.remainingTime = remaining
+                // Round up to prevent skipping seconds due to timer drift
+                self.remainingTime = ceil(remaining)
             }
         }
     }
