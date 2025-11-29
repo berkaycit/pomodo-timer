@@ -21,8 +21,8 @@ enum TimerState {
 // MARK: - Timer Preset
 
 enum TimerPreset: Int, CaseIterable, Hashable {
-    case one = 1
     case twentyFive = 25
+    case thirtyFive = 35
     case fortyFive = 45
 
     var seconds: TimeInterval {
